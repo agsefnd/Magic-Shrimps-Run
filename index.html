@@ -165,6 +165,23 @@
         canvas {
             display: block;
         }
+        
+        #loading-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 30, 60, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(110, 69, 226, 0.8);
+            border: 2px solid #6e45e2;
+            min-width: 300px;
+            color: white;
+            z-index: 11;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -179,6 +196,11 @@
                 <button id="start-button" disabled>Start Game</button>
             </div>
             
+            <div id="loading-screen">
+                <h2>Memuat Game...</h2>
+                <p><span id="loading-percentage">0</span>%</p>
+            </div>
+
             <div id="game-over">
                 <h1>Game Over</h1>
                 <p>Your Score: <span id="final-score">0</span></p>
@@ -205,10 +227,16 @@
         let gameStarted = false, gameOver = false;
         let speed = 0.5;
         let clock = new THREE.Clock();
-        let lastObstacleLane = null; // Tambahkan variabel baru di sini
+        let lastObstacleLane = null;
+        let currentSpeedLevel = 0;
+        let loadingScreen, loadingPercentage;
         
         // Initialize the game
         function init() {
+            // Setup loading screen elements
+            loadingScreen = document.getElementById('loading-screen');
+            loadingPercentage = document.getElementById('loading-percentage');
+
             // Setup scene
             scene = new THREE.Scene();
 
@@ -295,7 +323,26 @@
         }
         
         function loadModels() {
-            const loader = new THREE.GLTFLoader();
+            const loadingManager = new THREE.LoadingManager();
+
+            loadingManager.onStart = function() {
+                loadingScreen.style.display = 'block';
+                document.getElementById('start-screen').style.display = 'none';
+            };
+
+            loadingManager.onProgress = function(item, loaded, total) {
+                const percentage = Math.round((loaded / total) * 100);
+                loadingPercentage.textContent = percentage;
+            };
+            
+            loadingManager.onLoad = function() {
+                loadingScreen.style.display = 'none';
+                document.getElementById('start-screen').style.display = 'block';
+                document.querySelector('#start-screen p').textContent = 'Collect shrimps and avoid obstacles!';
+                document.getElementById('start-button').disabled = false;
+            };
+
+            const loader = new THREE.GLTFLoader(loadingManager);
 
             const loadWizard = new Promise((resolve, reject) => {
                 loader.load('wizard.glb', function (gltf) {
@@ -335,7 +382,7 @@
                 loader.load('obstacle.glb', function (gltf) {
                     obstacleModel = gltf.scene;
                     obstacleModel.position.x = 0; 
-                    obstacleModel.scale.set(1.5, 1.5, 1.5);
+                    obstacleModel.scale.set(1.8, 1.8, 1.8);
                     obstacleModel.traverse(node => {
                         if (node.isMesh) node.castShadow = true;
                     });
@@ -350,12 +397,13 @@
             gameStarted = true;
             gameOver = false;
             score = 0;
-            speed = 0.5;
+            speed = 0.5; // Reset speed
+            currentSpeedLevel = 0; // Reset speed level
             obstacles.forEach(o => scene.remove(o));
             shrimps.forEach(s => scene.remove(s));
             obstacles = [];
             shrimps = [];
-            lastObstacleLane = null; // Reset saat memulai game
+            lastObstacleLane = null;
             
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('score').textContent = 'Score: 0';
@@ -431,7 +479,7 @@
             if (!gameStarted || gameOver) return;
             
             let laneIndex = Math.floor(Math.random() * 3);
-            const type = Math.random() > 0.5 ? 'obstacle' : 'shrimp';
+            const type = Math.random() > 0.3 ? 'obstacle' : 'shrimp';
             
             if (type === 'obstacle' && obstacleModel) {
                 // Pastikan rintangan tidak muncul di jalur yang sama dua kali berturut-turut
@@ -462,8 +510,9 @@
                 shrimps.push(shrimp);
             }
             
-            const nextSpawn = Math.max(500, 1500 - score * 10);
-            setTimeout(spawnObjects, nextSpawn);
+            // Logika baru: Peningkatan frekuensi spawn objek
+            const spawnInterval = Math.max(300, 1500 - (score * 15));
+            setTimeout(spawnObjects, spawnInterval);
         }
         
         function checkCollisions() {
@@ -489,8 +538,14 @@
                     score++;
                     document.getElementById('score').textContent = `Score: ${score}`;
                     
-                    speed = Math.min(2.0, speed + 0.01);
-                    
+                    // Logika peningkatan kecepatan setiap kelipatan 5 skor
+                    const newSpeedLevel = Math.floor(score / 5);
+                    if (score > 0 && score % 5 === 0 && newSpeedLevel > currentSpeedLevel) {
+                        currentSpeedLevel = newSpeedLevel;
+                        speed += 0.2;
+                        console.log("Kecepatan meningkat! Kecepatan baru:", speed);
+                    }
+
                     scene.remove(shrimp);
                     shrimps.splice(i, 1);
                 }
