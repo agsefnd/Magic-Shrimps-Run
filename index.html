@@ -231,6 +231,12 @@
         let currentSpeedLevel = 0;
         let loadingScreen, loadingPercentage;
         
+        // Audio elements
+        // Hanya menggunakan BGM untuk musik latar
+        const bgm = new Audio('efek.mp3');
+        bgm.loop = true;
+        bgm.volume = 0.5;
+        
         // Initialize the game
         function init() {
             // Setup loading screen elements
@@ -412,6 +418,9 @@
                 wizard.position.set(lanePositions[currentLane], 0, 0);
             }
             
+            // Putar BGM saat game dimulai
+            bgm.play().catch(e => console.error("Error playing BGM:", e));
+
             spawnObjects();
         }
         
@@ -555,6 +564,10 @@
         function endGame() {
             gameOver = true;
             
+            // Hentikan BGM saat game berakhir
+            bgm.pause();
+            bgm.currentTime = 0;
+
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('shrimpWizardHighScore', highScore);
